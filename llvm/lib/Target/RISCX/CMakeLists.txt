@@ -1,6 +1,10 @@
 add_llvm_component_group(RISCX)
 set(LLVM_TARGET_DEFINITIONS RISCX.td)
 
+tablegen(LLVM RISCXGenSubtargetInfo.inc -gen-subtarget)
+
+add_public_tablegen_target(RISCXCommonTableGen)
+
 add_llvm_target(RISCXCodeGen
   RISCXTargetMachine.cpp
 
@@ -12,6 +16,8 @@ add_llvm_target(RISCXCodeGen
   Core
   IPO
   MC
+  RISCXDesc
+  RISCXInfo
   Scalar
   SelectionDAG
   Support
@@ -20,5 +26,7 @@ add_llvm_target(RISCXCodeGen
 
   ADD_TO_COMPONENT
   RISCX
-
   )
+
+add_subdirectory(TargetInfo)
+add_subdirectory(MCTargetDesc)

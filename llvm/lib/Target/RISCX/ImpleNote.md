@@ -1,1 +1,5 @@
 Implement CodeGenTaretMachineImple
+Triple?
+LLVMInitializeRISCXTargetInfo
+LLVMInitializeRISCXTarget
+LLVMInitializeRISCXTargetMC
