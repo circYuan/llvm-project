@@ -545,13 +545,15 @@ RISCVLegalizerInfo::RISCVLegalizerInfo(const RISCVSubtarget &ST)
       .legalFor(ST.hasStdExtZfh(), {{s16, s32}})
       .legalFor(ST.hasStdExtZfh() && ST.hasStdExtD(), {{s16, s64}})
       .libcallFor({{s32, s64}})
-      .libcallFor(ST.is64Bit(), {{s32, s128}, {s64, s128}});
+      .libcallFor(ST.is64Bit(), {{s32, s128}, {s64, s128}})
+      .libcallFor(ST.hasStdExtF() && !ST.hasStdExtZfhmin(), {s16, s32});
   getActionDefinitionsBuilder(G_FPEXT)
       .legalFor(ST.hasStdExtD(), {{s64, s32}})
       .legalFor(ST.hasStdExtZfh(), {{s32, s16}})
       .legalFor(ST.hasStdExtZfh() && ST.hasStdExtD(), {{s64, s16}})
       .libcallFor({{s64, s32}})
-      .libcallFor(ST.is64Bit(), {{s128, s32}, {s128, s64}});
+      .libcallFor(ST.is64Bit(), {{s128, s32}, {s128, s64}})
+      .libcallFor(ST.hasStdExtF() && !ST.hasStdExtZfhmin(), {s32, s16});
 
   getActionDefinitionsBuilder(G_FCMP)
       .legalFor(ST.hasStdExtF(), {{sXLen, s32}})
@@ -635,6 +637,18 @@ RISCVLegalizerInfo::RISCVLegalizerInfo(const RISCVSubtarget &ST)
   getActionDefinitionsBuilder({G_FPOWI, G_FLDEXP})
       .libcallFor({{s32, s32}, {s64, s32}})
       .libcallFor(ST.is64Bit(), {s128, s32});
+
+  getActionDefinitionsBuilder(G_FCANONICALIZE)
+      .legalFor(ST.hasStdExtF(), {s32})
+      .legalFor(ST.hasStdExtD(), {s64})
+      .legalFor(ST.hasStdExtZfh(), {s16})
+      .widenScalarIf(
+          [=, &ST](const LegalityQuery &Query) {
+            return Query.Types[0].isScalar() &&
+                   Query.Types[0].getSizeInBits() == 16 && ST.hasStdExtF() &&
+                   !ST.hasStdExtZfh();
+          },
+          LegalizeMutations::changeTo(0, s32));
 
   getActionDefinitionsBuilder(G_VASTART).customFor({p0});
 
