@@ -546,6 +546,7 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     setOperationAction({ISD::SINT_TO_FP, ISD::UINT_TO_FP}, XLenVT, Custom);
   }
 
+
   if (Subtarget.hasStdExtZfhminOrZhinxmin()) {
     if (Subtarget.hasStdExtZfhOrZhinx()) {
       setOperationAction(FPLegalNodeTypes, MVT::f16, Legal);
@@ -7655,6 +7656,8 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
   default:
     reportFatalInternalError(
         "Unimplemented RISCVTargetLowering::LowerOperation Case");
+  case ISD::CopyToReg:
+    return Op;
   case ISD::PREFETCH:
     return LowerPREFETCH(Op, Subtarget, DAG);
   case ISD::ATOMIC_FENCE:
@@ -24300,6 +24303,9 @@ RISCVTargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
           return std::make_pair(0U, &RISCV::FPR16RegClass);
         if (Subtarget.hasStdExtZhinxmin())
           return std::make_pair(0U, &RISCV::GPRF16NoX0RegClass);
+      } else if (VT == MVT::bf16) {
+        if (Subtarget.hasStdExtZfbfmin())
+          return std::make_pair(0U, &RISCV::FPR16RegClass);
       } else if (VT == MVT::f32) {
         if (Subtarget.hasStdExtF())
           return std::make_pair(0U, &RISCV::FPR32RegClass);
@@ -24396,6 +24402,9 @@ RISCVTargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
         return std::make_pair(0U, &RISCV::FPR16CRegClass);
       if (Subtarget.hasStdExtZhinxmin())
         return std::make_pair(0U, &RISCV::GPRF16CRegClass);
+    } else if (VT == MVT::bf16) {
+      if (Subtarget.hasStdExtZfbfmin())
+        return std::make_pair(0U, &RISCV::FPR16CRegClass);
     } else if (VT == MVT::f32) {
       if (Subtarget.hasStdExtF())
         return std::make_pair(0U, &RISCV::FPR32CRegClass);
@@ -24503,7 +24512,8 @@ RISCVTargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
       }
       if (VT == MVT::f32 || VT == MVT::Other)
         return std::make_pair(FReg, &RISCV::FPR32RegClass);
-      if (Subtarget.hasStdExtZfhmin() && VT == MVT::f16) {
+      if ((Subtarget.hasStdExtZfhmin() && VT == MVT::f16) ||
+          (Subtarget.hasStdExtZfbfmin() && VT == MVT::bf16)) {
         unsigned RegNo = FReg - RISCV::F0_F;
         unsigned HReg = RISCV::F0_H + RegNo;
         return std::make_pair(HReg, &RISCV::FPR16RegClass);
@@ -25268,6 +25278,11 @@ bool RISCVTargetLowering::splitValueIntoRegisterParts(
     }
   }
 
+  if (ValueVT == MVT::bf16 && PartVT == MVT::f16 && NumParts == 1) {
+    Parts[0] = Val;
+    return true;
+  }
+
   return false;
 }
 
@@ -25342,6 +25357,14 @@ SDValue RISCVTargetLowering::joinRegisterPartsIntoValue(
       return Val;
     }
   }
+
+  if (ValueVT == MVT::bf16 && PartVT == MVT::f16 && NumParts == 1) {
+    Register Reg = cast<RegisterSDNode>(Parts[0]->getOperand(1))->getReg();
+    SDValue Val = DAG.getCopyFromReg(Parts[0]->getOperand(0), DL, Reg, ValueVT, Parts[0].getOperand(2));
+    const_cast<SDValue*>(Parts)[0] = Val;
+    return Val;
+  }
+
   return SDValue();
 }
 
